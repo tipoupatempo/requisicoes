@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel — Farmácia/Almoxarifado</title>
+  <link rel="stylesheet" href="assets/base.css">
+  <link rel="stylesheet" href="assets/requisicoes.css">
+  <script src="config.js"></script>
+  <script src="assets/comum.js"></script>
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-conteudo">
+      <div class="marca"><small>Painel da Farmácia/Almoxarifado</small><strong>Poupatempo da Saúde</strong></div>
+      <div class="topo-acoes">
+        <div class="usuario oculto" id="barra-usuario">
+          <span class="nome" id="nome-usuario"></span>
+          <button type="button" class="botao botao-claro" id="abrir-troca">Trocar senha</button>
+          <button type="button" class="botao botao-claro" id="sair">Sair</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section id="tela-login" class="container estreito">
+    <form id="form-login" class="cartao">
+      <h1>Entrar no painel</h1>
+      <p class="sub">Entre com o usuário e a senha cadastrados pelo administrador.</p>
+      <div id="erro-login" class="alerta alerta-erro oculto" role="alert"></div>
+      <div class="campo">
+        <label for="usuario">Usuário</label>
+        <input type="text" id="usuario" autocomplete="username" autocapitalize="off">
+      </div>
+      <div class="campo">
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" autocomplete="current-password">
+      </div>
+      <button type="submit" id="entrar" class="botao botao-primario botao-bloco">Entrar</button>
+    </form>
+    <p class="rodape-links"><a href="index.html">Voltar ao início</a></p>
+  </section>
+
+  <section id="tela-painel" class="painel oculto">
+    <div class="indicadores" id="indicadores"></div>
+    <div class="filtros">
+      <div>
+        <label for="f-status">Status</label>
+        <select id="f-status"></select>
+      </div>
+      <div>
+        <label for="f-setor">Setor</label>
+        <select id="f-setor"></select>
+      </div>
+      <div class="busca-campo">
+        <label for="f-busca">Buscar</label>
+        <input type="search" id="f-busca" placeholder="Número, responsável, setor, item…">
+      </div>
+      <div class="filtros-botoes">
+        <button type="button" class="botao botao-secundario" id="notificar">🔔 Ativar notificações</button>
+        <button type="button" class="botao botao-secundario" id="recarregar">Atualizar</button>
+      </div>
+    </div>
+    <div class="atualizado" id="atualizado"></div>
+    <div class="lista">
+      <div class="linha lista-cab">
+        <span>Número</span><span>Pedido</span><span>Itens</span><span>Status</span><span>Atendido por</span><span>Recebida</span>
+      </div>
+      <div id="lista"></div>
+    </div>
+  </section>
+
+  <div id="fundo-gaveta" class="fundo-gaveta oculto"></div>
+  <aside id="gaveta" class="gaveta oculto" role="dialog" aria-modal="true" aria-labelledby="gaveta-titulo">
+    <div class="gaveta-cab">
+      <div id="gaveta-titulo"></div>
+      <button type="button" class="fechar" id="fechar" aria-label="Fechar">×</button>
+    </div>
+    <div class="gaveta-corpo" id="gaveta-corpo"></div>
+  </aside>
+
+  <div id="troca" class="oculto">
+    <div class="fundo-gaveta" id="fundo-troca"></div>
+    <form class="cartao modal" id="form-troca" role="dialog" aria-modal="true" aria-labelledby="troca-titulo" novalidate>
+      <h2 id="troca-titulo">Trocar senha</h2>
+      <p class="sub" id="troca-aviso"></p>
+      <div id="erro-troca" class="alerta alerta-erro oculto" role="alert"></div>
+      <div class="campo" id="campo-atual">
+        <label for="t-atual">Senha atual</label>
+        <input type="password" id="t-atual" autocomplete="current-password">
+      </div>
+      <div class="campo">
+        <label for="t-nova">Nova senha <span class="dica">(mínimo 6 caracteres)</span></label>
+        <input type="password" id="t-nova" autocomplete="new-password">
+      </div>
+      <div class="campo">
+        <label for="t-confirma">Repita a nova senha</label>
+        <input type="password" id="t-confirma" autocomplete="new-password">
+      </div>
+      <div class="botoes-modal">
+        <button type="button" class="botao botao-secundario" id="t-cancelar">Cancelar</button>
+        <button type="submit" class="botao botao-primario" id="t-salvar">Salvar nova senha</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const el = id => document.getElementById(id);
+    const CHAVE_SESSAO = 'requisicoes.sessao';
+    const CHAVE_NOTIF = 'requisicoes.notificar';
+    const TITULO_BASE = document.title;
+    // senhaLogin: só em memória, para não pedir a senha provisória de novo na troca obrigatória
+    const estado = { sessao: null, tela: null, requisicoes: [], aberta: null, timer: null, senhaLogin: null, trocaObrigatoria: false, conhecidas: null };
+
+    // ---------- Sessão ----------
+
+    async function api(acao) {
+      const args = Array.prototype.slice.call(arguments, 1);
+      try {
+        return await chamar.apply(null, [acao, estado.sessao.token].concat(args));
+      } catch (e) {
+        if (/SESSAO_EXPIRADA/.test(mensagemErro(e))) {
+          encerrar('Sua sessão expirou. Entre novamente.');
+          throw new Error('Sessão expirada.');
+        }
+        if (/TROCAR_SENHA/.test(mensagemErro(e))) {
+          abrirTroca(true);
+          throw new Error('Crie sua senha pessoal para continuar.');
+        }
+        throw e;
+      }
+    }
+
+    function salvarSessao() {
+      try { sessionStorage.setItem(CHAVE_SESSAO, JSON.stringify(estado.sessao)); } catch (e) { /* sem armazenamento */ }
+    }
+
+    function iniciar(sessao) {
+      estado.sessao = sessao;
+      salvarSessao();
+      el('nome-usuario').textContent = sessao.nome;
+      el('barra-usuario').classList.remove('oculto');
+      el('tela-login').classList.add('oculto');
+      el('tela-painel').classList.remove('oculto');
+      if (sessao.deveTrocar) abrirTroca(true);
+      else liberarPainel();
+    }
+
+    async function liberarPainel() {
+      if (!estado.tela) {
+        el('lista').innerHTML = '<div class="vazio"><span class="girando"></span> Carregando requisições…</div>';
+        try {
+          estado.tela = await chamar('dadosTela');
+        } catch (e) {
+          el('lista').innerHTML = '<div class="vazio">' + esc(mensagemErro(e)) + ' Recarregue a página para tentar de novo.</div>';
+          return;
+        }
+        el('f-status').add(new Option('Em aberto', 'abertas'));
+        el('f-status').add(new Option('Todas', ''));
+        estado.tela.status.forEach(s => el('f-status').add(new Option(s, s)));
+        el('f-setor').add(new Option('Todos', ''));
+        estado.tela.setores.forEach(s => el('f-setor').add(new Option(s, s)));
+      }
+      carregar();
+      clearInterval(estado.timer);
+      // Continua atualizando com a aba em segundo plano, para as notificações chegarem
+      estado.timer = setInterval(() => carregar(true), 60000);
+    }
+
+    function encerrar(aviso) {
+      if (estado.sessao && !aviso) chamar('sair', estado.sessao.token).catch(() => {});
+      estado.sessao = null;
+      estado.senhaLogin = null;
+      estado.conhecidas = null;
+      document.title = TITULO_BASE;
+      clearInterval(estado.timer);
+      try { sessionStorage.removeItem(CHAVE_SESSAO); } catch (e) { /* sem armazenamento */ }
+      fecharTroca();
+      fechar();
+      el('barra-usuario').classList.add('oculto');
+      el('tela-painel').classList.add('oculto');
+      el('tela-login').classList.remove('oculto');
+      el('senha').value = '';
+      el('erro-login').textContent = aviso || '';
+      el('erro-login').classList.toggle('oculto', !aviso);
+    }
+
+    el('form-login').addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const botao = el('entrar');
+      el('erro-login').classList.add('oculto');
+      botao.disabled = true;
+      botao.innerHTML = '<span class="girando"></span> Entrando…';
+      try {
+        const senha = el('senha').value;
+        const sessao = await chamar('entrar', el('usuario').value.trim(), senha);
+        estado.senhaLogin = sessao.deveTrocar ? senha : null;
+        el('senha').value = '';
+        iniciar(sessao);
+      } catch (e) {
+        el('erro-login').textContent = mensagemErro(e);
+        el('erro-login').classList.remove('oculto');
+      } finally {
+        botao.disabled = false;
+        botao.textContent = 'Entrar';
+      }
+    });
+    el('sair').addEventListener('click', () => encerrar());
+
+    // ---------- Trocar senha ----------
+
+    // obrigatoria: primeiro acesso ou senha redefinida; o painel só libera depois da troca
+    function abrirTroca(obrigatoria) {
+      estado.trocaObrigatoria = !!obrigatoria;
+      const temSenhaLogin = obrigatoria && !!estado.senhaLogin;
+      el('troca-aviso').textContent = obrigatoria ? 'Você entrou com uma senha provisória. Crie sua senha pessoal para continuar.' : '';
+      el('troca-aviso').classList.toggle('oculto', !obrigatoria);
+      el('campo-atual').classList.toggle('oculto', temSenhaLogin);
+      el('t-cancelar').classList.toggle('oculto', !!obrigatoria);
+      el('erro-troca').classList.add('oculto');
+      ['t-atual', 't-nova', 't-confirma'].forEach(id => { el(id).value = ''; });
+      el('troca').classList.remove('oculto');
+      (temSenhaLogin ? el('t-nova') : el('t-atual')).focus();
+    }
+    function fecharTroca() { el('troca').classList.add('oculto'); }
+    function erroTroca(msg) {
+      el('erro-troca').textContent = msg;
+      el('erro-troca').classList.remove('oculto');
+    }
+    el('abrir-troca').addEventListener('click', () => abrirTroca(false));
+    el('t-cancelar').addEventListener('click', fecharTroca);
+    el('fundo-troca').addEventListener('click', () => { if (!estado.trocaObrigatoria) fecharTroca(); });
+
+    el('form-troca').addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const atual = el('campo-atual').classList.contains('oculto') ? estado.senhaLogin : el('t-atual').value;
+      const nova = el('t-nova').value;
+      if (!atual) return erroTroca('Informe a senha atual.');
+      if (nova.length < 6) return erroTroca('A nova senha precisa ter pelo menos 6 caracteres.');
+      if (nova !== el('t-confirma').value) return erroTroca('As duas senhas novas não são iguais.');
+
+      const botao = el('t-salvar');
+      botao.disabled = true;
+      botao.innerHTML = '<span class="girando"></span> Salvando…';
+      try {
+        await chamar('trocarSenha', estado.sessao.token, atual, nova);
+        estado.senhaLogin = null;
+        fecharTroca();
+        if (estado.sessao.deveTrocar) {
+          estado.sessao.deveTrocar = false;
+          salvarSessao();
+          liberarPainel();
+        }
+        el('atualizado').textContent = 'Senha alterada com sucesso.';
+      } catch (e) {
+        if (/SESSAO_EXPIRADA/.test(mensagemErro(e))) return encerrar('Sua sessão expirou. Entre novamente.');
+        erroTroca(mensagemErro(e));
+      } finally {
+        botao.disabled = false;
+        botao.textContent = 'Salvar nova senha';
+      }
+    });
+
+    // ---------- Lista ----------
+
+    async function carregar(silencioso) {
+      if (!silencioso) el('lista').innerHTML = '<div class="vazio"><span class="girando"></span> Carregando requisições…</div>';
+      try {
+        const r = await api('listarRequisicoes');
+        estado.requisicoes = r.requisicoes;
+        el('atualizado').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' · atualiza sozinho a cada minuto';
+        avisarNovas(r.requisicoes);
+        desenhar();
+      } catch (e) {
+        if (!silencioso && estado.sessao) el('lista').innerHTML = '<div class="vazio">' + esc(mensagemErro(e)) + '</div>';
+      }
+    }
+    el('recarregar').addEventListener('click', () => carregar());
+    ['f-status', 'f-setor', 'f-busca'].forEach(id => el(id).addEventListener('input', desenharLista));
+
+    function desenhar() {
+      desenharIndicadores();
+      desenharLista();
+    }
+
+    function desenharIndicadores() {
+      const conta = s => estado.requisicoes.filter(r => r.status === s).length;
+      el('indicadores').innerHTML = ['Recebida', 'Em separação', 'Atendida parcialmente', 'Atendida'].map(s =>
+        '<button type="button" class="indicador" data-status="' + esc(s) + '"><span>' + esc(s) +
+        (estado.tela.statusAbertos.includes(s) ? '' : ' (30 dias)') + '</span><strong>' + conta(s) + '</strong></button>').join('');
+    }
+    el('indicadores').addEventListener('click', e => {
+      const botao = e.target.closest('[data-status]');
+      if (!botao) return;
+      el('f-status').value = botao.dataset.status;
+      desenharLista();
+    });
+
+    function desenharLista() {
+      const status = el('f-status').value;
+      const setor = el('f-setor').value;
+      const busca = el('f-busca').value.trim().toLowerCase();
+      const lista = estado.requisicoes.filter(r => {
+        if (status === 'abertas' ? !estado.tela.statusAbertos.includes(r.status) : status && r.status !== status) return false;
+        if (setor && r.setor !== setor) return false;
+        if (!busca) return true;
+        return [r.numero, r.responsavel, r.setor].concat(r.itens.map(i => i.descricao + ' ' + i.codigo))
+          .join(' ').toLowerCase().includes(busca);
+      });
+      el('lista').innerHTML = lista.length ? lista.map(r =>
+        '<button type="button" class="linha item" data-numero="' + esc(r.numero) + '">' +
+        '<span class="item-num">' + esc(r.numero) + '</span>' +
+        '<span class="item-pedido"><strong>' + esc(resumoItens(r)) + '</strong><small>' + esc(r.setor) + ' · ' + esc(r.responsavel) + '</small></span>' +
+        '<span class="item-dado item-qtd">' + r.itens.length + '</span>' +
+        '<span>' + seloStatus(r.status) + '</span>' +
+        '<span class="item-dado item-atendente">' + (r.atendente ? esc(r.atendente) : '<em>Ninguém ainda</em>') + '</span>' +
+        '<span class="item-dado">' + esc(tempoDesde(r.data)) + '</span></button>').join('')
+        : '<div class="vazio">Nenhuma requisição encontrada.</div>';
+    }
+    el('lista').addEventListener('click', e => {
+      const linha = e.target.closest('[data-numero]');
+      if (linha) abrir(linha.dataset.numero);
+    });
+
+    // ---------- Notificações na área de trabalho ----------
+
+    function notificacoesLigadas() {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return false;
+      try { return localStorage.getItem(CHAVE_NOTIF) !== 'nao'; } catch (e) { return true; }
+    }
+    function atualizarBotaoNotif() {
+      const b = el('notificar');
+      if (!('Notification' in window)) { b.classList.add('oculto'); return; }
+      b.textContent = Notification.permission === 'denied' ? '🔕 Notificações bloqueadas'
+        : notificacoesLigadas() ? '🔔 Notificações ativas' : '🔔 Ativar notificações';
+    }
+    function bipe() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const som = ctx.createOscillator();
+        som.frequency.value = 880;
+        som.connect(ctx.destination);
+        som.start();
+        som.stop(ctx.currentTime + 0.2);
+      } catch (e) { /* sem som: a notificação ainda aparece */ }
+    }
+    el('notificar').addEventListener('click', async () => {
+      if (Notification.permission === 'denied') {
+        el('atualizado').textContent = 'As notificações estão bloqueadas neste navegador. Clique no cadeado ao lado do endereço do site e permita "Notificações".';
+        return;
+      }
+      let ligar = !notificacoesLigadas();
+      if (ligar && Notification.permission !== 'granted') ligar = (await Notification.requestPermission()) === 'granted';
+      try { localStorage.setItem(CHAVE_NOTIF, ligar ? 'sim' : 'nao'); } catch (e) { /* sem armazenamento */ }
+      if (ligar) bipe();
+      atualizarBotaoNotif();
+    });
+
+    function avisarNovas(requisicoes) {
+      const numeros = requisicoes.map(r => r.numero);
+      const novas = estado.conhecidas ? requisicoes.filter(r => !estado.conhecidas.includes(r.numero)) : [];
+      estado.conhecidas = numeros;
+      const pendentes = requisicoes.filter(r => r.status === 'Recebida').length;
+      document.title = (pendentes ? '(' + pendentes + ') ' : '') + TITULO_BASE;
+      if (!novas.length || !notificacoesLigadas()) return;
+      bipe();
+      novas.forEach(r => new Notification('Nova requisição: ' + r.numero, { body: r.setor + ' · ' + resumoItens(r) }));
+    }
+    atualizarBotaoNotif();
+
+    // ---------- Detalhe ----------
+
+    async function abrir(numero) {
+      estado.aberta = numero;
+      el('gaveta-titulo').innerHTML = '<strong>' + esc(numero) + '</strong>';
+      el('gaveta-corpo').innerHTML = '<div class="vazio"><span class="girando"></span> Carregando…</div>';
+      el('fundo-gaveta').classList.remove('oculto');
+      el('gaveta').classList.remove('oculto');
+      try {
+        desenharDetalhe(await api('detalharRequisicao', numero));
+      } catch (e) {
+        if (estado.aberta) el('gaveta-corpo').innerHTML = '<div class="alerta alerta-erro">' + esc(mensagemErro(e)) + '</div>';
+      }
+    }
+
+    function desenharDetalhe(r) {
+      el('gaveta-titulo').innerHTML = '<strong>' + esc(r.numero) + '</strong> ' + seloStatus(r.status);
+      el('gaveta-corpo').innerHTML =
+        dadosRequisicaoHtml(r) +
+        '<h3>Itens solicitados</h3>' +
+        '<div class="rolagem"><table class="tabela"><thead><tr><th>Item</th><th>Código</th><th>Descrição</th><th>Unid.</th>' +
+        '<th class="num">Estoque</th><th class="num">Solicitada</th><th class="num">Atendida</th></tr></thead><tbody>' +
+        r.itens.map((it, i) => '<tr><td>' + (i + 1) + '</td><td>' + esc(it.codigo || '—') + '</td><td>' + esc(it.descricao) + '</td><td>' + esc(it.unidade) + '</td>' +
+          '<td class="num">' + esc(numeroBr(it.estoque)) + '</td><td class="num">' + esc(numeroBr(it.solicitada)) + '</td>' +
+          '<td class="num"><input type="number" min="0" step="any" inputmode="decimal" data-item="' + i + '" value="' + (it.atendida == null ? '' : esc(it.atendida)) + '" aria-label="Quantidade atendida do item ' + (i + 1) + '"></td></tr>').join('') +
+        '</tbody></table></div>' +
+        '<form id="form-atender" class="acoes" novalidate>' +
+        '<div class="campo"><label for="novo-status">Status</label><select id="novo-status">' +
+        estado.tela.status.map(s => '<option' + (s === r.status ? ' selected' : '') + '>' + esc(s) + '</option>').join('') + '</select></div>' +
+        '<div class="campo"><label for="observacao">Observação ao solicitante <span class="dica">(obrigatória se recusar)</span></label>' +
+        '<textarea id="observacao" maxlength="500">' + esc(r.observacao) + '</textarea></div>' +
+        '<div id="erro-atender" class="alerta alerta-erro oculto" role="alert"></div>' +
+        '<div class="acoes-botoes"><button type="submit" class="botao botao-primario" id="salvar">Salvar</button></div></form>' +
+        '<h3>Andamento</h3>' + historicoHtml(r);
+      el('form-atender').addEventListener('submit', salvar);
+    }
+
+    function fechar() {
+      estado.aberta = null;
+      el('fundo-gaveta').classList.add('oculto');
+      el('gaveta').classList.add('oculto');
+    }
+    el('fechar').addEventListener('click', fechar);
+    el('fundo-gaveta').addEventListener('click', fechar);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && estado.aberta) fechar(); });
+
+    // As regras de status ficam no servidor; a tela só mostra a mensagem que ele devolver
+    async function salvar(e) {
+      e.preventDefault();
+      const botao = el('salvar');
+      const entradas = Array.from(el('gaveta-corpo').querySelectorAll('[data-item]'));
+      el('erro-atender').classList.add('oculto');
+      botao.disabled = true;
+      botao.innerHTML = '<span class="girando"></span> Salvando…';
+      try {
+        await api('atualizarRequisicao', estado.aberta, {
+          status: el('novo-status').value,
+          observacao: el('observacao').value,
+          quantidades: entradas.map(c => c.value === '' ? null : Number(c.value))
+        });
+        fechar();
+        carregar(true);
+      } catch (err) {
+        if (!estado.aberta) return;
+        el('erro-atender').textContent = mensagemErro(err);
+        el('erro-atender').classList.remove('oculto');
+      } finally {
+        botao.disabled = false;
+        botao.textContent = 'Salvar';
+      }
+    }
+
+    try {
+      const salva = JSON.parse(sessionStorage.getItem(CHAVE_SESSAO));
+      if (salva) iniciar(salva);
+    } catch (e) { /* sem sessão salva: mostra o login */ }
+  </script>
+</body>
+</html>

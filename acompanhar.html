@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acompanhar requisição — Farmácia/Almoxarifado</title>
+  <link rel="stylesheet" href="assets/base.css">
+  <link rel="stylesheet" href="assets/requisicoes.css">
+  <script src="config.js"></script>
+  <script src="assets/comum.js"></script>
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-conteudo">
+      <div class="marca"><small>Farmácia/Almoxarifado</small><strong>Poupatempo da Saúde</strong></div>
+    </div>
+  </header>
+
+  <main class="container">
+    <form id="busca" class="cartao">
+      <h1>Acompanhar requisição</h1>
+      <p class="sub">Digite o número recebido ao enviar a ficha.</p>
+      <div class="busca">
+        <div>
+          <label for="numero">Nº da requisição</label>
+          <input type="text" id="numero" placeholder="REQ-2026-0001" autocapitalize="characters">
+        </div>
+        <button type="submit" class="botao botao-primario" id="consultar">Consultar</button>
+      </div>
+    </form>
+
+    <div id="erro" class="alerta alerta-erro oculto" role="alert" style="margin-top: 16px"></div>
+    <section id="resultado" class="cartao oculto" style="margin-top: 16px"></section>
+    <p class="rodape-links"><a href="index.html">Voltar ao início</a></p>
+  </main>
+
+  <script>
+    const el = id => document.getElementById(id);
+
+    function mostrarErro(mensagem) {
+      el('resultado').classList.add('oculto');
+      el('erro').textContent = mensagem;
+      el('erro').classList.remove('oculto');
+    }
+
+    async function consultar(numero) {
+      const botao = el('consultar');
+      el('erro').classList.add('oculto');
+      botao.disabled = true;
+      botao.innerHTML = '<span class="girando"></span>';
+      try {
+        const r = await chamar('consultarRequisicao', numero);
+        if (!r) return mostrarErro('Requisição não encontrada. Confira o número.');
+        el('resultado').innerHTML =
+          '<div class="cab-resultado"><h2 style="margin:0">' + esc(r.numero) + '</h2>' + seloStatus(r.status) + '</div>' +
+          dadosRequisicaoHtml(r) +
+          (r.observacao ? '<div class="alerta alerta-info"><strong>Farmácia/Almoxarifado:</strong> ' + esc(r.observacao) + '</div>' : '') +
+          '<div class="rolagem"><table class="tabela"><thead><tr><th>Item</th><th>Descrição</th><th>Unid.</th>' +
+          '<th class="num">Solicitada</th><th class="num">Atendida</th></tr></thead><tbody>' +
+          r.itens.map((it, i) => '<tr><td>' + (i + 1) + '</td><td>' + esc(it.descricao) + '</td><td>' + esc(it.unidade) + '</td>' +
+            '<td class="num">' + esc(numeroBr(it.solicitada)) + '</td><td class="num">' + esc(numeroBr(it.atendida)) + '</td></tr>').join('') +
+          '</tbody></table></div><h3>Andamento</h3>' + historicoHtml(r);
+        el('resultado').classList.remove('oculto');
+      } catch (e) {
+        mostrarErro(mensagemErro(e));
+      } finally {
+        botao.disabled = false;
+        botao.textContent = 'Consultar';
+      }
+    }
+
+    el('busca').addEventListener('submit', e => {
+      e.preventDefault();
+      if (el('numero').value.trim()) consultar(el('numero').value);
+    });
+
+    const numeroInicial = new URLSearchParams(location.search).get('n');
+    if (numeroInicial) {
+      el('numero').value = numeroInicial;
+      consultar(numeroInicial);
+    }
+  </script>
+</body>
+</html>
