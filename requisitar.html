@@ -70,8 +70,7 @@
           </thead>
           <tbody id="itens"></tbody>
         </table>
-        <datalist id="lista-codigos"></datalist>
-        <datalist id="lista-descricoes"></datalist>
+        <ul id="lista-materiais" class="combo-lista oculto" role="listbox" aria-label="Materiais"></ul>
         <div class="acoes-itens">
           <button type="button" class="botao botao-secundario" id="adicionar">+ Adicionar item</button>
           <span id="dica-itens"></span>
@@ -120,10 +119,7 @@
       dados.setores.forEach(s => el('setor').add(new Option(s, s)));
       el('justificativas').innerHTML = dados.justificativas.map(j =>
         '<label class="check"><input type="checkbox" name="justificativa" value="' + esc(j) + '"> ' + esc(j) + '</label>').join('');
-      el('lista-codigos').innerHTML = dados.catalogo.filter(c => c.codigo).map(c =>
-        '<option value="' + esc(c.codigo) + '">' + esc(c.descricao) + '</option>').join('');
-      el('lista-descricoes').innerHTML = dados.catalogo.map(c => '<option value="' + esc(c.descricao) + '"></option>').join('');
-      el('dica-itens').textContent = 'Linhas em branco são ignoradas. Até ' + dados.maxItens + ' itens por ficha.';
+      el('dica-itens').textContent = 'Clique na descrição para ver os materiais do setor. Se o item não estiver na lista, digite. Linhas em branco são ignoradas. Até ' + dados.maxItens + ' itens por ficha.';
 
       const agora = new Date();
       el('data').value = agora.toLocaleDateString('pt-BR');
@@ -140,8 +136,8 @@
       corpo.insertAdjacentHTML('beforeend',
         '<tr>' +
         '<td class="col-n" data-rotulo="Item ">' + n + '</td>' +
-        '<td class="col-codigo" data-rotulo="Código"><input type="text" data-campo="codigo" list="lista-codigos" maxlength="30" aria-label="Código do item ' + n + '"></td>' +
-        '<td class="col-descricao" data-rotulo="Descrição (REMUME)"><input type="text" data-campo="descricao" list="lista-descricoes" maxlength="150" aria-label="Descrição do item ' + n + '"></td>' +
+        '<td class="col-codigo" data-rotulo="Código"><input type="text" data-campo="codigo" maxlength="30" aria-label="Código do item ' + n + '"></td>' +
+        '<td class="col-descricao" data-rotulo="Descrição (REMUME)"><input type="text" class="combo" data-campo="descricao" maxlength="150" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="lista-materiais" aria-label="Descrição do item ' + n + '"></td>' +
         '<td class="col-unidade" data-rotulo="Unidade"><select data-campo="unidade" aria-label="Unidade do item ' + n + '">' + opcoes + '</select></td>' +
         '<td class="col-num" data-rotulo="Estoque do setor"><input type="number" data-campo="estoque" min="0" step="any" inputmode="decimal" aria-label="Estoque do setor do item ' + n + '"></td>' +
         '<td class="col-num" data-rotulo="Qtd. solicitada"><input type="number" data-campo="solicitada" min="0" step="any" inputmode="decimal" aria-label="Quantidade solicitada do item ' + n + '"></td>' +
@@ -163,12 +159,107 @@
       const valor = e.target.value.trim().toLowerCase();
       if (!valor) return;
       const achado = tela.catalogo.find(c => c[nome].toLowerCase() === valor);
-      if (!achado) return;
-      const linha = e.target.closest('tr');
-      campo(linha, 'codigo').value = achado.codigo;
-      campo(linha, 'descricao').value = achado.descricao;
-      if (tela.unidadesMedida.includes(achado.unidade)) campo(linha, 'unidade').value = achado.unidade;
+      if (achado) preencherMaterial(e.target.closest('tr'), achado);
+    });
+
+    function preencherMaterial(linha, material) {
+      campo(linha, 'codigo').value = material.codigo;
+      campo(linha, 'descricao').value = material.descricao;
+      if (tela.unidadesMedida.includes(material.unidade)) campo(linha, 'unidade').value = material.unidade;
       ['codigo', 'descricao', 'unidade'].forEach(c => campo(linha, c).removeAttribute('aria-invalid'));
+    }
+
+    // Lista de materiais: primeiro os do setor; ao digitar, entram também os outros do catálogo
+    const lista = el('lista-materiais');
+    const combo = { campo: null, opcoes: [], ativa: -1 };
+    const normalizar = v => v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    function montarLista() {
+      const setor = el('setor').value;
+      const busca = normalizar(combo.campo.value.trim());
+      const confere = m => !busca || normalizar(m.descricao + ' ' + m.codigo).includes(busca);
+      const doSetor = tela.catalogo.filter(m => m.setores.includes(setor) && confere(m));
+      const outros = busca ? tela.catalogo.filter(m => !m.setores.includes(setor) && confere(m)) : [];
+      combo.opcoes = doSetor.concat(outros);
+      combo.ativa = -1;
+      combo.campo.removeAttribute('aria-activedescendant');
+
+      const opcao = (m, i) => '<li id="material-' + i + '" role="option" aria-selected="false" data-opcao="' + i + '">' +
+        '<span>' + esc(m.descricao) + '</span><small>' + esc([m.codigo, m.unidade].filter(Boolean).join(' · ')) + '</small></li>';
+      const aviso = texto => '<li class="combo-aviso" role="presentation">' + esc(texto) + '</li>';
+      let html = '';
+      if (!setor) html += aviso('Selecione o setor para ver os materiais dele.');
+      else if (!doSetor.length && !busca) html += aviso('Nenhum material cadastrado para este setor. Digite o item.');
+      html += doSetor.map(opcao).join('');
+      if (outros.length) html += aviso(setor ? 'Outros materiais do catálogo' : 'Catálogo') + outros.map((m, i) => opcao(m, doSetor.length + i)).join('');
+      if (busca && !combo.opcoes.length) html += aviso('Não está na lista. Pode continuar digitando.');
+      lista.innerHTML = html;
+    }
+
+    function abrirLista(entrada) {
+      if (combo.campo && combo.campo !== entrada) combo.campo.setAttribute('aria-expanded', 'false');
+      combo.campo = entrada;
+      entrada.parentNode.appendChild(lista);
+      montarLista();
+      lista.classList.remove('oculto');
+      lista.scrollTop = 0;
+      entrada.setAttribute('aria-expanded', 'true');
+    }
+
+    function fecharLista() {
+      if (!combo.campo) return;
+      lista.classList.add('oculto');
+      combo.campo.setAttribute('aria-expanded', 'false');
+      combo.campo.removeAttribute('aria-activedescendant');
+      combo.campo = null;
+    }
+
+    function marcarOpcao(i) {
+      lista.querySelectorAll('[role=option]').forEach(o => o.setAttribute('aria-selected', String(Number(o.dataset.opcao) === i)));
+      combo.ativa = i;
+      const item = document.getElementById('material-' + i);
+      if (item) {
+        item.scrollIntoView({ block: 'nearest' });
+        combo.campo.setAttribute('aria-activedescendant', item.id);
+      }
+    }
+
+    function escolher(i) {
+      const linha = combo.campo.closest('tr');
+      preencherMaterial(linha, combo.opcoes[i]);
+      fecharLista();
+      campo(linha, campo(linha, 'unidade').value ? 'estoque' : 'unidade').focus();
+    }
+
+    const ehDescricao = alvo => alvo.dataset && alvo.dataset.campo === 'descricao';
+    corpo.addEventListener('focusin', e => { if (ehDescricao(e.target)) abrirLista(e.target); });
+    corpo.addEventListener('focusout', e => { if (ehDescricao(e.target)) fecharLista(); });
+    corpo.addEventListener('click', e => { if (ehDescricao(e.target) && combo.campo !== e.target) abrirLista(e.target); });
+    corpo.addEventListener('input', e => {
+      if (ehDescricao(e.target) && combo.campo === e.target) montarLista();
+    });
+    corpo.addEventListener('keydown', e => {
+      if (!ehDescricao(e.target)) return;
+      if (e.key === 'Escape' && combo.campo) {
+        e.preventDefault();
+        fecharLista();
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!combo.campo) abrirLista(e.target);
+        if (!combo.opcoes.length) return;
+        const passo = e.key === 'ArrowDown' ? 1 : -1;
+        const total = combo.opcoes.length;
+        marcarOpcao(combo.ativa < 0 && passo < 0 ? total - 1 : (combo.ativa + passo + total) % total);
+      } else if (e.key === 'Enter' && combo.campo && combo.ativa >= 0) {
+        e.preventDefault();
+        escolher(combo.ativa);
+      }
+    });
+    // mousedown: escolhe antes de o campo perder o foco e fechar a lista
+    lista.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const opcao = e.target.closest('[data-opcao]');
+      if (opcao) escolher(Number(opcao.dataset.opcao));
     });
     el('ficha').addEventListener('input', e => e.target.removeAttribute('aria-invalid'));
     el('ficha').addEventListener('change', e => e.target.removeAttribute('aria-invalid'));
