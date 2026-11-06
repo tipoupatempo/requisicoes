@@ -45,8 +45,8 @@
           <input type="text" id="responsavel" maxlength="120" autocomplete="name">
         </div>
         <div class="campo">
-          <label for="cargo">Cargo <span class="obrig">*</span></label>
-          <input type="text" id="cargo" maxlength="80">
+          <label for="funcao">Função <span class="obrig">*</span></label>
+          <input type="text" id="funcao" maxlength="80">
         </div>
         <div class="campo">
           <label for="horario">Horário da solicitação</label>
@@ -284,7 +284,7 @@
 
       if (!el('setor').value) marcar(el('setor'), 'Selecione o setor.');
       if (!el('responsavel').value.trim()) marcar(el('responsavel'), 'Informe o responsável pela solicitação.');
-      if (!el('cargo').value.trim()) marcar(el('cargo'), 'Informe o cargo.');
+      if (!el('funcao').value.trim()) marcar(el('funcao'), 'Informe a função.');
 
       const itens = [];
       Array.from(corpo.rows).forEach((linha, i) => {
@@ -315,7 +315,7 @@
       }
       el('erros').classList.add('oculto');
       return {
-        setor: el('setor').value, responsavel: el('responsavel').value.trim(), cargo: el('cargo').value.trim(),
+        setor: el('setor').value, responsavel: el('responsavel').value.trim(), funcao: el('funcao').value.trim(),
         justificativas, outro: el('j-outro').checked ? el('outro').value.trim() : '', itens, site: el('site').value
       };
     }
