@@ -87,11 +87,11 @@ function resumoItens(r) {
   const resto = r.itens.length - 1;
   return r.itens[0].descricao + (resto ? ' e mais ' + resto + (resto === 1 ? ' item' : ' itens') : '');
 }
-// Responsável e cargo só existem no painel: a consulta pública não traz nomes
+// Responsável e função só existem no painel: a consulta pública não traz nomes
 function dadosRequisicaoHtml(r) {
   return '<dl class="dados">' + [
     ['Unidade', r.unidade], ['Setor', r.setor], ['Enviada em', dataHora(r.data)],
-    ['Responsável', r.responsavel], ['Cargo', r.cargo], ['Justificativa', textoJustificativa(r)]
+    ['Responsável', r.responsavel], ['Função', r.funcao], ['Justificativa', textoJustificativa(r)]
   ].filter(p => p[1]).map(p => '<div><dt>' + esc(p[0]) + '</dt><dd>' + esc(p[1]) + '</dd></div>').join('') + '</dl>';
 }
 function historicoHtml(r) {
