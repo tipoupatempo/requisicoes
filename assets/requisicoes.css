@@ -115,6 +115,26 @@ input.combo[type=text] { padding-right: 28px; background-image: linear-gradient(
 .acoes textarea { min-height: 70px; }
 .acoes-botoes { display: flex; justify-content: flex-end; }
 
+/* Estoque */
+.abas { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid var(--borda); }
+.aba { border: 0; border-bottom: 3px solid transparent; margin-bottom: -2px; background: none; padding: 10px 18px; font: inherit; font-weight: 600; color: var(--texto-3); cursor: pointer; }
+.aba:hover { color: var(--texto); }
+.aba.ativa { color: var(--link); border-bottom-color: var(--azul); }
+.indicador.selecionado { border-color: var(--azul); }
+.filtros-estoque { grid-template-columns: 1fr auto; }
+.estoque-linha { grid-template-columns: 1fr 60px 80px 80px 90px 130px 130px; }
+.estoque-linha .num { text-align: right; font-variant-numeric: tabular-nums; }
+.estoque-linha > :nth-child(6) { padding-left: 14px; }
+.negativo { color: var(--vermelho); font-weight: 600; }
+.titulo-movimentos { margin: 24px 0 10px; }
+.sem-quebra { white-space: nowrap; }
+.botoes-item { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.grade-movimento { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.saldo-atual { margin: -6px 0 12px; font-size: 13px; color: var(--texto-3); min-height: 18px; }
+#movimentos .rolagem { margin-bottom: 0; }
+#movimentos .vazio { padding: 16px; }
+#movimentos .tabela { min-width: 720px; }
+
 @media (max-width: 900px) {
   .filtros { grid-template-columns: 1fr 1fr; }
   .busca-campo, .filtros-botoes { grid-column: 1 / -1; }
@@ -124,6 +144,14 @@ input.combo[type=text] { padding-right: 28px; background-image: linear-gradient(
   .item-qtd, .item-atendente { display: none; }
   .item-pedido { grid-column: 1 / -1; grid-row: 2; }
   .indicadores { grid-template-columns: 1fr 1fr; }
+  .filtros-botoes { flex-wrap: wrap; }
+  .estoque-linha { grid-template-columns: 1fr 1fr 1fr; }
+  .estoque-linha .item-pedido { grid-column: 1 / -2; grid-row: 1; }
+  .estoque-linha .num { text-align: left; }
+  .estoque-linha > :nth-child(6) { padding-left: 0; }
+  .estoque-linha [data-rotulo]::before { content: attr(data-rotulo); display: block; font-size: 11px; font-weight: 400; color: var(--texto-3); }
+  .estoque-linha .item-dado:not([data-rotulo]) { grid-row: 1; text-align: right; }
+  .estoque-linha [data-rotulo^="Última"] { grid-column: span 1; }
 }
 
 /* No celular cada item da ficha vira um cartão */
