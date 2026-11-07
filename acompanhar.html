@@ -12,7 +12,7 @@
 <body>
   <header class="topo">
     <div class="topo-conteudo">
-      <div class="marca"><small>Farmácia/Almoxarifado</small><strong>Poupatempo da Saúde</strong></div>
+      <div class="marca"><small data-equipe>Farmácia/Almoxarifado</small><strong>Poupatempo da Saúde</strong></div>
     </div>
   </header>
 
@@ -36,6 +36,7 @@
 
   <script>
     const el = id => document.getElementById(id);
+    el('numero').placeholder = FICHA.prefixo + '-' + new Date().getFullYear() + '-0001';
 
     function mostrarErro(mensagem) {
       el('resultado').classList.add('oculto');
@@ -54,7 +55,7 @@
         el('resultado').innerHTML =
           '<div class="cab-resultado"><h2 style="margin:0">' + esc(r.numero) + '</h2>' + seloStatus(r.status) + '</div>' +
           dadosRequisicaoHtml(r) +
-          (r.observacao ? '<div class="alerta alerta-info"><strong>Farmácia/Almoxarifado:</strong> ' + esc(r.observacao) + '</div>' : '') +
+          (r.observacao ? '<div class="alerta alerta-info"><strong>' + esc(FICHA.nome) + ':</strong> ' + esc(r.observacao) + '</div>' : '') +
           '<div class="rolagem"><table class="tabela"><thead><tr><th>Item</th><th>Descrição</th><th>Unid.</th>' +
           '<th class="num">Solicitada</th><th class="num">Atendida</th></tr></thead><tbody>' +
           r.itens.map((it, i) => '<tr><td>' + (i + 1) + '</td><td>' + esc(it.descricao) + '</td><td>' + esc(it.unidade) + '</td>' +

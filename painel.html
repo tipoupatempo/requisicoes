@@ -12,7 +12,7 @@
 <body>
   <header class="topo">
     <div class="topo-conteudo">
-      <div class="marca"><small>Painel da Farmácia/Almoxarifado</small><strong>Poupatempo da Saúde</strong></div>
+      <div class="marca"><small>Painel · <span data-equipe>Farmácia/Almoxarifado</span></small><strong>Poupatempo da Saúde</strong></div>
       <div class="topo-acoes">
         <div class="usuario oculto" id="barra-usuario">
           <span class="nome" id="nome-usuario"></span>
@@ -106,8 +106,8 @@
 
   <script>
     const el = id => document.getElementById(id);
-    const CHAVE_SESSAO = 'requisicoes.sessao';
-    const CHAVE_NOTIF = 'requisicoes.notificar';
+    const CHAVE_SESSAO = 'requisicoes.sessao.' + CHAVE_FICHA; // as duas equipes podem estar no mesmo navegador
+    const CHAVE_NOTIF = 'requisicoes.notificar.' + CHAVE_FICHA;
     const TITULO_BASE = document.title;
     // senhaLogin: só em memória, para não pedir a senha provisória de novo na troca obrigatória
     const estado = { sessao: null, tela: null, requisicoes: [], aberta: null, timer: null, senhaLogin: null, trocaObrigatoria: false, conhecidas: null };
@@ -388,10 +388,10 @@
       el('gaveta-corpo').innerHTML =
         dadosRequisicaoHtml(r) +
         '<h3>Itens solicitados</h3>' +
-        '<div class="rolagem"><table class="tabela"><thead><tr><th>Item</th><th>Código</th><th>Descrição</th><th>Unid.</th>' +
-        '<th class="num">Estoque</th><th class="num">Solicitada</th><th class="num">Atendida</th></tr></thead><tbody>' +
-        r.itens.map((it, i) => '<tr><td>' + (i + 1) + '</td><td>' + esc(it.codigo || '—') + '</td><td>' + esc(it.descricao) + '</td><td>' + esc(it.unidade) + '</td>' +
-          '<td class="num">' + esc(numeroBr(it.estoque)) + '</td><td class="num">' + esc(numeroBr(it.solicitada)) + '</td>' +
+        '<div class="rolagem"><table class="tabela"><thead><tr><th>Item</th>' + (estado.tela.pedeCodigo ? '<th>Código</th>' : '') + '<th>Descrição</th><th>Unid.</th>' +
+        (estado.tela.pedeEstoque ? '<th class="num">Estoque</th>' : '') + '<th class="num">Solicitada</th><th class="num">Atendida</th></tr></thead><tbody>' +
+        r.itens.map((it, i) => '<tr><td>' + (i + 1) + '</td>' + (estado.tela.pedeCodigo ? '<td>' + esc(it.codigo || '—') + '</td>' : '') + '<td>' + esc(it.descricao) + '</td><td>' + esc(it.unidade) + '</td>' +
+          (estado.tela.pedeEstoque ? '<td class="num">' + esc(numeroBr(it.estoque)) + '</td>' : '') + '<td class="num">' + esc(numeroBr(it.solicitada)) + '</td>' +
           '<td class="num"><input type="number" min="0" step="any" inputmode="decimal" data-item="' + i + '" value="' + (it.atendida == null ? '' : esc(it.atendida)) + '" aria-label="Quantidade atendida do item ' + (i + 1) + '"></td></tr>').join('') +
         '</tbody></table></div>' +
         '<form id="form-atender" class="acoes" novalidate>' +

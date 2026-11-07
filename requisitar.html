@@ -12,7 +12,7 @@
 <body>
   <header class="topo">
     <div class="topo-conteudo">
-      <div class="marca"><small>Farmácia/Almoxarifado</small><strong>Poupatempo da Saúde</strong></div>
+      <div class="marca"><small data-equipe>Farmácia/Almoxarifado</small><strong>Poupatempo da Saúde</strong></div>
     </div>
   </header>
 
@@ -23,7 +23,7 @@
     <form id="ficha" class="cartao oculto" novalidate>
       <div class="ficha-topo">
         <img src="assets/logo-fundacao-abc.png" alt="Fundação do ABC">
-        <h1>Requisição de medicamentos e materiais<br>médico-hospitalares para uso interno</h1>
+        <h1 id="titulo-ficha"></h1>
         <img src="assets/logo-santo-andre.png" alt="Prefeitura de Santo André">
       </div>
 
@@ -61,10 +61,10 @@
           <thead>
             <tr>
               <th class="col-n">Item</th>
-              <th class="col-codigo">Código</th>
-              <th>Descrição (REMUME)</th>
+              <th class="col-codigo" id="th-codigo">Código</th>
+              <th id="th-descricao"></th>
               <th class="col-unidade">Unidade</th>
-              <th class="col-num">Estoque do setor</th>
+              <th class="col-num" id="th-estoque">Estoque do setor</th>
               <th class="col-num">Quantidade solicitada</th>
             </tr>
           </thead>
@@ -91,17 +91,17 @@
 
       <div id="erros" class="alerta alerta-erro oculto" role="alert" tabindex="-1" style="margin-top: 20px"></div>
       <div class="rodape-ficha">
-        <button type="submit" class="botao botao-primario" id="enviar">Enviar à Farmácia/Almoxarifado</button>
+        <button type="submit" class="botao botao-primario" id="enviar"></button>
       </div>
     </form>
 
     <section id="sucesso" class="cartao sucesso oculto" tabindex="-1">
-      <p>Requisição enviada à Farmácia/Almoxarifado</p>
+      <p id="enviada"></p>
       <p class="numero" id="numero"></p>
       <p class="sub">Anote o número para acompanhar o atendimento.</p>
       <div class="botoes">
         <a class="botao botao-primario" id="link-acompanhar" href="acompanhar.html">Acompanhar</a>
-        <a class="botao botao-secundario" href="requisitar.html">Nova requisição</a>
+        <a class="botao botao-secundario" href="requisitar.html" data-ficha>Nova requisição</a>
       </div>
     </section>
     <p class="rodape-links"><a href="index.html">Voltar ao início</a></p>
@@ -111,15 +111,23 @@
     const el = id => document.getElementById(id);
     const corpo = el('itens');
     let tela = null;
+    const textoEnviar = 'Enviar ' + FICHA.destino;
+    el('titulo-ficha').innerHTML = FICHA.titulo;
+    el('enviar').textContent = textoEnviar;
+    el('enviada').textContent = 'Requisição enviada ' + FICHA.destino;
 
     function iniciar(dados) {
       tela = dados;
+      el('th-descricao').textContent = dados.rotuloDescricao;
+      el('th-codigo').classList.toggle('oculto', !dados.pedeCodigo);
+      el('th-estoque').classList.toggle('oculto', !dados.pedeEstoque);
       el('unidade').value = dados.unidade;
       el('setor').add(new Option('Selecione…', ''));
       dados.setores.forEach(s => el('setor').add(new Option(s, s)));
       el('justificativas').innerHTML = dados.justificativas.map(j =>
         '<label class="check"><input type="checkbox" name="justificativa" value="' + esc(j) + '"> ' + esc(j) + '</label>').join('');
-      el('dica-itens').textContent = 'Clique na descrição para ver os materiais do setor. Se o item não estiver na lista, digite. Linhas em branco são ignoradas. Até ' + dados.maxItens + ' itens por ficha.';
+      el('dica-itens').textContent = (dados.catalogo.length ? 'Clique na descrição para ver os materiais do setor. Se o item não estiver na lista, digite.' : 'Digite o material e escolha a unidade.') +
+        ' Linhas em branco são ignoradas. Até ' + dados.maxItens + ' itens por ficha.';
 
       const agora = new Date();
       el('data').value = agora.toLocaleDateString('pt-BR');
@@ -133,13 +141,15 @@
     function adicionarLinha() {
       const n = corpo.rows.length + 1;
       const opcoes = '<option value="">—</option>' + tela.unidadesMedida.map(u => '<option>' + esc(u) + '</option>').join('');
+      // Sem catálogo não há lista para abrir: fica um campo de texto simples
+      const atributosCombo = tela.catalogo.length ? ' class="combo" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="lista-materiais"' : '';
       corpo.insertAdjacentHTML('beforeend',
         '<tr>' +
         '<td class="col-n" data-rotulo="Item ">' + n + '</td>' +
-        '<td class="col-codigo" data-rotulo="Código"><input type="text" data-campo="codigo" maxlength="30" aria-label="Código do item ' + n + '"></td>' +
-        '<td class="col-descricao" data-rotulo="Descrição (REMUME)"><input type="text" class="combo" data-campo="descricao" maxlength="150" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="lista-materiais" aria-label="Descrição do item ' + n + '"></td>' +
+        (tela.pedeCodigo ? '<td class="col-codigo" data-rotulo="Código"><input type="text" data-campo="codigo" maxlength="30" aria-label="Código do item ' + n + '"></td>' : '') +
+        '<td class="col-descricao" data-rotulo="' + esc(tela.rotuloDescricao) + '"><input type="text"' + atributosCombo + ' data-campo="descricao" maxlength="150" autocomplete="off" aria-label="Descrição do item ' + n + '"></td>' +
         '<td class="col-unidade" data-rotulo="Unidade"><select data-campo="unidade" aria-label="Unidade do item ' + n + '">' + opcoes + '</select></td>' +
-        '<td class="col-num" data-rotulo="Estoque do setor"><input type="number" data-campo="estoque" min="0" step="any" inputmode="decimal" aria-label="Estoque do setor do item ' + n + '"></td>' +
+        (tela.pedeEstoque ? '<td class="col-num" data-rotulo="Estoque do setor"><input type="number" data-campo="estoque" min="0" step="any" inputmode="decimal" aria-label="Estoque do setor do item ' + n + '"></td>' : '') +
         '<td class="col-num" data-rotulo="Qtd. solicitada"><input type="number" data-campo="solicitada" min="0" step="any" inputmode="decimal" aria-label="Quantidade solicitada do item ' + n + '"></td>' +
         '</tr>');
       el('adicionar').classList.toggle('oculto', corpo.rows.length >= tela.maxItens);
@@ -163,10 +173,10 @@
     });
 
     function preencherMaterial(linha, material) {
-      campo(linha, 'codigo').value = material.codigo;
+      if (tela.pedeCodigo) campo(linha, 'codigo').value = material.codigo;
       campo(linha, 'descricao').value = material.descricao;
       if (tela.unidadesMedida.includes(material.unidade)) campo(linha, 'unidade').value = material.unidade;
-      ['codigo', 'descricao', 'unidade'].forEach(c => campo(linha, c).removeAttribute('aria-invalid'));
+      linha.querySelectorAll('[aria-invalid]').forEach(c => c.removeAttribute('aria-invalid'));
     }
 
     // Lista de materiais: primeiro os do setor; ao digitar, entram também os outros do catálogo
@@ -197,6 +207,7 @@
     }
 
     function abrirLista(entrada) {
+      if (!tela.catalogo.length) return;
       if (combo.campo && combo.campo !== entrada) combo.campo.setAttribute('aria-expanded', 'false');
       combo.campo = entrada;
       entrada.parentNode.appendChild(lista);
@@ -228,7 +239,7 @@
       const linha = combo.campo.closest('tr');
       preencherMaterial(linha, combo.opcoes[i]);
       fecharLista();
-      campo(linha, campo(linha, 'unidade').value ? 'estoque' : 'unidade').focus();
+      campo(linha, !campo(linha, 'unidade').value ? 'unidade' : tela.pedeEstoque ? 'estoque' : 'solicitada').focus();
     }
 
     const ehDescricao = alvo => alvo.dataset && alvo.dataset.campo === 'descricao';
@@ -288,12 +299,12 @@
 
       const itens = [];
       Array.from(corpo.rows).forEach((linha, i) => {
-        const v = nome => campo(linha, nome).value.trim();
+        const v = nome => { const c = campo(linha, nome); return c ? c.value.trim() : ''; };
         if (!['codigo', 'descricao', 'unidade', 'estoque', 'solicitada'].some(v)) return;
         const rotulo = 'Item ' + (i + 1) + ': ';
         if (!v('descricao')) marcar(campo(linha, 'descricao'), rotulo + 'informe a descrição.');
         if (!v('unidade')) marcar(campo(linha, 'unidade'), rotulo + 'selecione a unidade.');
-        if (v('estoque') === '' || Number(v('estoque')) < 0) marcar(campo(linha, 'estoque'), rotulo + 'informe o estoque do setor.');
+        if (tela.pedeEstoque && (v('estoque') === '' || Number(v('estoque')) < 0)) marcar(campo(linha, 'estoque'), rotulo + 'informe o estoque do setor.');
         if (!(Number(v('solicitada')) > 0)) marcar(campo(linha, 'solicitada'), rotulo + 'a quantidade solicitada deve ser maior que zero.');
         itens.push({
           codigo: v('codigo'), descricao: v('descricao'), unidade: v('unidade'),
@@ -331,7 +342,7 @@
       try {
         const r = await chamar('enviarRequisicao', ficha);
         el('numero').textContent = r.numero;
-        el('link-acompanhar').href = 'acompanhar.html?n=' + encodeURIComponent(r.numero);
+        el('link-acompanhar').href = comFicha('acompanhar.html?n=' + encodeURIComponent(r.numero));
         el('ficha').classList.add('oculto');
         el('sucesso').classList.remove('oculto');
         window.scrollTo(0, 0);
@@ -340,7 +351,7 @@
         mostrarErros(['A requisição não foi enviada. ' + mensagemErro(err)]);
       } finally {
         botao.disabled = false;
-        botao.textContent = 'Enviar à Farmácia/Almoxarifado';
+        botao.textContent = textoEnviar;
       }
     });
 
