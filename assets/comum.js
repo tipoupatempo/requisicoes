@@ -1,3 +1,19 @@
+// A ficha vem do link (?tipo=escritorio); sem tipo é a da Farmácia, para os links antigos continuarem valendo
+const CHAVE_FICHA = (function () {
+  const tipo = new URLSearchParams(location.search).get('tipo');
+  return Object.prototype.hasOwnProperty.call(REQUISICOES.tipos, tipo) ? tipo : 'farmacia';
+})();
+const FICHA = REQUISICOES.tipos[CHAVE_FICHA];
+document.title = document.title.replace('Farmácia/Almoxarifado', FICHA.nome);
+
+function comFicha(href) {
+  return CHAVE_FICHA === 'farmacia' ? href : href + (href.includes('?') ? '&' : '?') + 'tipo=' + CHAVE_FICHA;
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-equipe]').forEach(e => { e.textContent = FICHA.nome; });
+  document.querySelectorAll('a[data-ficha]').forEach(a => { a.href = comFicha(a.getAttribute('href')); });
+});
+
 const CHAVE_TEMA = 'chamados.tema'; // mesma chave dos chamados: o tema escolhido vale nos dois sistemas
 
 function temaSalvo() {
@@ -38,7 +54,7 @@ async function chamar(acao) {
   const args = Array.prototype.slice.call(arguments, 1);
   let r;
   try {
-    r = await fetch(REQUISICOES.api, {
+    r = await fetch(FICHA.api, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ acao: acao, args: args }),
