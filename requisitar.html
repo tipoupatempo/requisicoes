@@ -112,6 +112,10 @@
     const corpo = el('itens');
     let tela = null;
     let mexeu = false; // já começou a preencher: uma atualização dos cadastros não pode apagar o que foi digitado
+    // Identifica este envio: se a resposta se perder e a pessoa reenviar a mesma ficha, o servidor
+    // devolve o número já gerado em vez de gravar outra requisição. Muda a cada alteração na ficha.
+    const novoEnvio = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+    let idEnvio = novoEnvio();
     const textoEnviar = 'Enviar ' + FICHA.destino;
     el('titulo-ficha').innerHTML = FICHA.titulo;
     el('enviar').textContent = textoEnviar;
@@ -281,8 +285,8 @@
       const opcao = e.target.closest('[data-opcao]');
       if (opcao) escolher(Number(opcao.dataset.opcao));
     });
-    el('ficha').addEventListener('input', e => { mexeu = true; e.target.removeAttribute('aria-invalid'); });
-    el('ficha').addEventListener('change', e => e.target.removeAttribute('aria-invalid'));
+    el('ficha').addEventListener('input', e => { mexeu = true; idEnvio = novoEnvio(); e.target.removeAttribute('aria-invalid'); });
+    el('ficha').addEventListener('change', e => { idEnvio = novoEnvio(); e.target.removeAttribute('aria-invalid'); });
 
     // Escrever em "Outro" já marca a opção
     el('outro').addEventListener('input', () => { el('j-outro').checked = el('outro').value.trim() !== ''; });
@@ -336,7 +340,8 @@
       el('erros').classList.add('oculto');
       return {
         setor: el('setor').value, responsavel: el('responsavel').value.trim(), funcao: el('funcao').value.trim(),
-        justificativas, outro: el('j-outro').checked ? el('outro').value.trim() : '', itens, site: el('site').value
+        justificativas, outro: el('j-outro').checked ? el('outro').value.trim() : '', itens, site: el('site').value,
+        envio: idEnvio
       };
     }
 
