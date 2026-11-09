@@ -146,22 +146,39 @@
       else liberarPainel();
     }
 
+    function preencherFiltros() {
+      const status = el('f-status').value;
+      const setor = el('f-setor').value;
+      el('f-status').length = 0;
+      el('f-status').add(new Option('Em aberto', 'abertas'));
+      el('f-status').add(new Option('Todas', ''));
+      estado.tela.status.forEach(s => el('f-status').add(new Option(s, s)));
+      el('f-setor').length = 0;
+      el('f-setor').add(new Option('Todos', ''));
+      estado.tela.setores.forEach(s => el('f-setor').add(new Option(s, s)));
+      if (status) el('f-status').value = status;
+      if (setor && estado.tela.setores.includes(setor)) el('f-setor').value = setor;
+    }
+
     async function liberarPainel() {
+      // A lista sai junto com os dados da tela, sem esperar um pelo outro
+      const lista = api('listarRequisicoes');
+      lista.catch(() => { /* carregar() mostra o erro */ });
       if (!estado.tela) {
         el('lista').innerHTML = '<div class="vazio"><span class="girando"></span> Carregando requisições…</div>';
         try {
-          estado.tela = await chamar('dadosTela');
+          estado.tela = await carregarDadosTela(dados => {
+            estado.tela = dados;
+            preencherFiltros();
+            if (estado.conhecidas) desenhar(); // só redesenha se a lista já chegou
+          });
         } catch (e) {
           el('lista').innerHTML = '<div class="vazio">' + esc(mensagemErro(e)) + ' Recarregue a página para tentar de novo.</div>';
           return;
         }
-        el('f-status').add(new Option('Em aberto', 'abertas'));
-        el('f-status').add(new Option('Todas', ''));
-        estado.tela.status.forEach(s => el('f-status').add(new Option(s, s)));
-        el('f-setor').add(new Option('Todos', ''));
-        estado.tela.setores.forEach(s => el('f-setor').add(new Option(s, s)));
+        preencherFiltros();
       }
-      carregar();
+      carregar(false, lista);
       clearInterval(estado.timer);
       // Continua atualizando com a aba em segundo plano, para as notificações chegarem
       estado.timer = setInterval(() => carregar(true), 60000);
@@ -263,10 +280,11 @@
 
     // ---------- Lista ----------
 
-    async function carregar(silencioso) {
+    // pedido: a chamada já iniciada por liberarPainel, para não buscar a lista duas vezes
+    async function carregar(silencioso, pedido) {
       if (!silencioso) el('lista').innerHTML = '<div class="vazio"><span class="girando"></span> Carregando requisições…</div>';
       try {
-        const r = await api('listarRequisicoes');
+        const r = await (pedido || api('listarRequisicoes'));
         estado.requisicoes = r.requisicoes;
         el('atualizado').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' · atualiza sozinho a cada minuto';
         avisarNovas(r.requisicoes);
@@ -372,14 +390,26 @@
 
     async function abrir(numero) {
       estado.aberta = numero;
-      el('gaveta-titulo').innerHTML = '<strong>' + esc(numero) + '</strong>';
-      el('gaveta-corpo').innerHTML = '<div class="vazio"><span class="girando"></span> Carregando…</div>';
+      estado.mexeuDetalhe = false;
+      // A lista já traz os itens: o detalhe abre na hora e só o andamento espera o servidor
+      const daLista = estado.requisicoes.find(r => r.numero === numero);
+      if (daLista) desenharDetalhe(daLista);
+      else {
+        el('gaveta-titulo').innerHTML = '<strong>' + esc(numero) + '</strong>';
+        el('gaveta-corpo').innerHTML = '<div class="vazio"><span class="girando"></span> Carregando…</div>';
+      }
       el('fundo-gaveta').classList.remove('oculto');
       el('gaveta').classList.remove('oculto');
       try {
-        desenharDetalhe(await api('detalharRequisicao', numero));
+        const r = await api('detalharRequisicao', numero);
+        if (estado.aberta !== numero) return;
+        // Não apaga o que a pessoa já começou a digitar
+        if (!daLista || !estado.mexeuDetalhe) desenharDetalhe(r);
+        else el('andamento').innerHTML = historicoHtml(r);
       } catch (e) {
-        if (estado.aberta) el('gaveta-corpo').innerHTML = '<div class="alerta alerta-erro">' + esc(mensagemErro(e)) + '</div>';
+        if (estado.aberta !== numero) return;
+        if (el('andamento')) el('andamento').innerHTML = '<div class="alerta alerta-erro">' + esc(mensagemErro(e)) + '</div>';
+        else el('gaveta-corpo').innerHTML = '<div class="alerta alerta-erro">' + esc(mensagemErro(e)) + '</div>';
       }
     }
 
@@ -401,9 +431,11 @@
         '<textarea id="observacao" maxlength="500">' + esc(r.observacao) + '</textarea></div>' +
         '<div id="erro-atender" class="alerta alerta-erro oculto" role="alert"></div>' +
         '<div class="acoes-botoes"><button type="submit" class="botao botao-primario" id="salvar">Salvar</button></div></form>' +
-        '<h3>Andamento</h3>' + historicoHtml(r);
+        '<h3>Andamento</h3><div id="andamento">' +
+        (r.historico ? historicoHtml(r) : '<div class="vazio"><span class="girando"></span> Carregando andamento…</div>') + '</div>';
       el('form-atender').addEventListener('submit', salvar);
     }
+    el('gaveta-corpo').addEventListener('input', () => { estado.mexeuDetalhe = true; });
 
     function fechar() {
       estado.aberta = null;
@@ -423,12 +455,16 @@
       botao.disabled = true;
       botao.innerHTML = '<span class="girando"></span> Salvando…';
       try {
-        await api('atualizarRequisicao', estado.aberta, {
+        const r = await api('atualizarRequisicao', estado.aberta, {
           status: el('novo-status').value,
           observacao: el('observacao').value,
           quantidades: entradas.map(c => c.value === '' ? null : Number(c.value))
         });
+        // A lista mostra o novo status na hora; a recarga confirma em segundo plano
+        const i = estado.requisicoes.findIndex(x => x.numero === r.numero);
+        if (i >= 0) estado.requisicoes[i] = r;
         fechar();
+        desenhar();
         carregar(true);
       } catch (err) {
         if (!estado.aberta) return;
