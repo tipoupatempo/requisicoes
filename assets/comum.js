@@ -49,22 +49,31 @@ document.addEventListener('DOMContentLoaded', () => {
   aplicarTema(temaSalvo());
 });
 
-// Sem cookies: o login do Google no navegador não interfere (evita o erro de várias contas)
+// Sem cookies: o login do Google no navegador não interfere (evita o erro de várias contas).
+// Conexão travada vira erro depois de LIMITE_CHAMADA, em vez de deixar a tela carregando para sempre.
+const LIMITE_CHAMADA = 45000;
 async function chamar(acao) {
   const args = Array.prototype.slice.call(arguments, 1);
-  let r;
+  const controle = new AbortController();
+  const prazo = setTimeout(() => controle.abort(), LIMITE_CHAMADA);
+  let j;
   try {
-    r = await fetch(FICHA.api, {
+    const r = await fetch(FICHA.api, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ acao: acao, args: args }),
       credentials: 'omit',
-      redirect: 'follow'
+      redirect: 'follow',
+      signal: controle.signal
     });
+    j = await r.json();
   } catch (e) {
-    throw new Error('Sem conexão com o servidor. Verifique a internet e tente de novo.');
+    throw new Error(controle.signal.aborted
+      ? 'O servidor demorou demais para responder. Verifique a internet e tente de novo.'
+      : 'Sem conexão com o servidor. Verifique a internet e tente de novo.');
+  } finally {
+    clearTimeout(prazo);
   }
-  const j = await r.json();
   if (!j.ok) throw new Error(j.erro);
   return j.dados;
 }
