@@ -188,9 +188,8 @@
       const setor = el('setor').value;
       const busca = normalizar(combo.campo.value.trim());
       const confere = m => !busca || normalizar(m.descricao + ' ' + m.codigo).includes(busca);
-      // Material sem setor definido (ex.: cadastrado por uma entrada no estoque) aparece para todos
-      const doSetor = tela.catalogo.filter(m => (!m.setores.length || m.setores.includes(setor)) && confere(m));
-      const outros = busca ? tela.catalogo.filter(m => m.setores.length && !m.setores.includes(setor) && confere(m)) : [];
+      const doSetor = tela.catalogo.filter(m => m.setores.includes(setor) && confere(m));
+      const outros = busca ? tela.catalogo.filter(m => !m.setores.includes(setor) && confere(m)) : [];
       combo.opcoes = doSetor.concat(outros);
       combo.ativa = -1;
       combo.campo.removeAttribute('aria-activedescendant');
