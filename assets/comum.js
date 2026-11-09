@@ -68,6 +68,22 @@ async function chamar(acao) {
   if (!j.ok) throw new Error(j.erro);
   return j.dados;
 }
+// Setores, unidades e catálogo quase não mudam: a tela abre com a cópia guardada neste navegador
+// e confere a versão do servidor em segundo plano; aoMudar recebe a nova se for diferente
+const CHAVE_DADOS_TELA = 'requisicoes.tela.' + CHAVE_FICHA;
+function carregarDadosTela(aoMudar) {
+  let guardada = null;
+  try { guardada = JSON.parse(localStorage.getItem(CHAVE_DADOS_TELA)); } catch (e) { /* sem cópia */ }
+  const doServidor = chamar('dadosTela').then(dados => {
+    const texto = JSON.stringify(dados);
+    try { localStorage.setItem(CHAVE_DADOS_TELA, texto); } catch (e) { /* vale só agora */ }
+    if (guardada && aoMudar && texto !== JSON.stringify(guardada)) aoMudar(dados);
+    return dados;
+  });
+  if (!guardada) return doServidor;
+  doServidor.catch(() => { /* fica a cópia guardada */ });
+  return Promise.resolve(guardada);
+}
 function mensagemErro(e) {
   return String((e && e.message) || e).replace(/^(Exception|Error|Erro):\s*/i, '');
 }

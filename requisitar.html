@@ -111,19 +111,28 @@
     const el = id => document.getElementById(id);
     const corpo = el('itens');
     let tela = null;
+    let mexeu = false; // já começou a preencher: uma atualização dos cadastros não pode apagar o que foi digitado
     const textoEnviar = 'Enviar ' + FICHA.destino;
     el('titulo-ficha').innerHTML = FICHA.titulo;
     el('enviar').textContent = textoEnviar;
     el('enviada').textContent = 'Requisição enviada ' + FICHA.destino;
 
+    function preencherSetores(setores) {
+      const escolhido = el('setor').value;
+      el('setor').length = 0;
+      el('setor').add(new Option('Selecione…', ''));
+      setores.forEach(s => el('setor').add(new Option(s, s)));
+      if (setores.includes(escolhido)) el('setor').value = escolhido;
+    }
+
     function iniciar(dados) {
       tela = dados;
+      corpo.innerHTML = '';
       el('th-descricao').textContent = dados.rotuloDescricao;
       el('th-codigo').classList.toggle('oculto', !dados.pedeCodigo);
       el('th-estoque').classList.toggle('oculto', !dados.pedeEstoque);
       el('unidade').value = dados.unidade;
-      el('setor').add(new Option('Selecione…', ''));
-      dados.setores.forEach(s => el('setor').add(new Option(s, s)));
+      preencherSetores(dados.setores);
       el('justificativas').innerHTML = dados.justificativas.map(j =>
         '<label class="check"><input type="checkbox" name="justificativa" value="' + esc(j) + '"> ' + esc(j) + '</label>').join('');
       el('dica-itens').textContent = (dados.catalogo.length ? 'Clique na descrição para ver os materiais do setor. Se o item não estiver na lista, digite.' : 'Digite o material e escolha a unidade.') +
@@ -272,7 +281,7 @@
       const opcao = e.target.closest('[data-opcao]');
       if (opcao) escolher(Number(opcao.dataset.opcao));
     });
-    el('ficha').addEventListener('input', e => e.target.removeAttribute('aria-invalid'));
+    el('ficha').addEventListener('input', e => { mexeu = true; e.target.removeAttribute('aria-invalid'); });
     el('ficha').addEventListener('change', e => e.target.removeAttribute('aria-invalid'));
 
     // Escrever em "Outro" já marca a opção
@@ -355,7 +364,15 @@
       }
     });
 
-    chamar('dadosTela').then(iniciar).catch(err => {
+    // Cadastros mudaram desde a cópia guardada: refaz a ficha se ainda está em branco;
+    // se já começou a preencher, atualiza só a lista de materiais e os setores
+    function cadastrosMudaram(dados) {
+      if (!mexeu) return iniciar(dados);
+      tela.catalogo = dados.catalogo;
+      preencherSetores(dados.setores);
+    }
+
+    carregarDadosTela(cadastrosMudaram).then(iniciar).catch(err => {
       el('carregando').classList.add('oculto');
       el('erro-carga').textContent = 'Não foi possível carregar a ficha: ' + mensagemErro(err);
       el('erro-carga').classList.remove('oculto');
