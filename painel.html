@@ -42,12 +42,6 @@
   </section>
 
   <section id="tela-painel" class="painel oculto">
-    <div class="abas" role="tablist">
-      <button type="button" class="aba ativa" role="tab" aria-selected="true" data-vista="requisicoes">Requisições</button>
-      <button type="button" class="aba" role="tab" aria-selected="false" data-vista="estoque">Estoque</button>
-    </div>
-
-    <div id="vista-requisicoes">
     <div class="indicadores" id="indicadores"></div>
     <div class="filtros">
       <div>
@@ -74,31 +68,6 @@
       </div>
       <div id="lista"></div>
     </div>
-    </div>
-
-    <div id="vista-estoque" class="oculto">
-      <div class="indicadores" id="ind-estoque"></div>
-      <div class="filtros filtros-estoque">
-        <div class="busca-campo">
-          <label for="e-busca">Buscar</label>
-          <input type="search" id="e-busca" placeholder="Material, código, requisição…">
-        </div>
-        <div class="filtros-botoes">
-          <button type="button" class="botao botao-primario" id="nova-entrada">Registrar entrada</button>
-          <button type="button" class="botao botao-secundario" id="nova-saida">Registrar saída</button>
-          <button type="button" class="botao botao-secundario" id="recarregar-estoque">Atualizar</button>
-        </div>
-      </div>
-      <div class="atualizado" id="atualizado-estoque"></div>
-      <div class="lista">
-        <div class="linha estoque-linha lista-cab">
-          <span>Material</span><span>Unid.</span><span class="num">Tenho</span><span class="num">Vai sair</span><span class="num">Vai sobrar</span><span>Última entrada</span><span>Última saída</span>
-        </div>
-        <div id="lista-estoque"></div>
-      </div>
-      <h2 class="titulo-movimentos">Entradas e saídas</h2>
-      <div class="cartao" id="movimentos"></div>
-    </div>
   </section>
 
   <div id="fundo-gaveta" class="fundo-gaveta oculto"></div>
@@ -109,43 +78,6 @@
     </div>
     <div class="gaveta-corpo" id="gaveta-corpo"></div>
   </aside>
-
-  <div id="movimento" class="oculto">
-    <div class="fundo-gaveta" id="fundo-movimento"></div>
-    <form class="cartao modal" id="form-movimento" role="dialog" aria-modal="true" aria-labelledby="movimento-titulo" novalidate>
-      <h2 id="movimento-titulo">Registrar entrada</h2>
-      <p class="sub" id="movimento-aviso"></p>
-      <div id="erro-movimento" class="alerta alerta-erro oculto" role="alert"></div>
-      <div class="campo">
-        <label for="m-descricao">Material</label>
-        <input type="text" id="m-descricao" list="m-materiais" maxlength="150" autocomplete="off">
-        <datalist id="m-materiais"></datalist>
-      </div>
-      <div class="campo oculto" id="campo-m-codigo">
-        <label for="m-codigo">Código <span class="dica">(opcional)</span></label>
-        <input type="text" id="m-codigo" maxlength="30" autocomplete="off">
-      </div>
-      <div class="grade-movimento">
-        <div class="campo">
-          <label for="m-quantidade">Quantidade</label>
-          <input type="number" id="m-quantidade" min="0" step="any" inputmode="decimal">
-        </div>
-        <div class="campo">
-          <label for="m-unidade">Unidade</label>
-          <select id="m-unidade"></select>
-        </div>
-      </div>
-      <p class="saldo-atual" id="m-saldo"></p>
-      <div class="campo">
-        <label for="m-observacao" id="m-observacao-rotulo">Observação</label>
-        <input type="text" id="m-observacao" maxlength="200" autocomplete="off">
-      </div>
-      <div class="botoes-modal">
-        <button type="button" class="botao botao-secundario" id="m-cancelar">Cancelar</button>
-        <button type="submit" class="botao botao-primario" id="m-salvar">Salvar</button>
-      </div>
-    </form>
-  </div>
 
   <div id="troca" class="oculto">
     <div class="fundo-gaveta" id="fundo-troca"></div>
@@ -178,7 +110,7 @@
     const CHAVE_NOTIF = 'requisicoes.notificar.' + CHAVE_FICHA;
     const TITULO_BASE = document.title;
     // senhaLogin: só em memória, para não pedir a senha provisória de novo na troca obrigatória
-    const estado = { sessao: null, tela: null, requisicoes: [], aberta: null, timer: null, senhaLogin: null, trocaObrigatoria: false, conhecidas: null, estoque: null, filtroEstoque: '', tipoMovimento: null };
+    const estado = { sessao: null, tela: null, requisicoes: [], aberta: null, timer: null, senhaLogin: null, trocaObrigatoria: false, conhecidas: null };
 
     // ---------- Sessão ----------
 
@@ -228,16 +160,11 @@
         estado.tela.status.forEach(s => el('f-status').add(new Option(s, s)));
         el('f-setor').add(new Option('Todos', ''));
         estado.tela.setores.forEach(s => el('f-setor').add(new Option(s, s)));
-        estado.tela.unidadesMedida.forEach(u => el('m-unidade').add(new Option(u, u)));
-        el('campo-m-codigo').classList.toggle('oculto', !estado.tela.pedeCodigo);
       }
       carregar();
       clearInterval(estado.timer);
       // Continua atualizando com a aba em segundo plano, para as notificações chegarem
-      estado.timer = setInterval(() => {
-        carregar(true);
-        if (!el('vista-estoque').classList.contains('oculto')) carregarEstoque(true);
-      }, 60000);
+      estado.timer = setInterval(() => carregar(true), 60000);
     }
 
     function encerrar(aviso) {
@@ -245,14 +172,11 @@
       estado.sessao = null;
       estado.senhaLogin = null;
       estado.conhecidas = null;
-      estado.estoque = null;
       document.title = TITULO_BASE;
       clearInterval(estado.timer);
       try { sessionStorage.removeItem(CHAVE_SESSAO); } catch (e) { /* sem armazenamento */ }
       fecharTroca();
       fechar();
-      fecharMovimento();
-      mostrarVista('requisicoes');
       el('barra-usuario').classList.add('oculto');
       el('tela-painel').classList.add('oculto');
       el('tela-login').classList.remove('oculto');
@@ -398,206 +322,6 @@
       if (linha) abrir(linha.dataset.numero);
     });
 
-    // ---------- Estoque ----------
-
-    function mostrarVista(vista) {
-      document.querySelectorAll('.aba').forEach(b => {
-        const ativa = b.dataset.vista === vista;
-        b.classList.toggle('ativa', ativa);
-        b.setAttribute('aria-selected', ativa);
-      });
-      el('vista-requisicoes').classList.toggle('oculto', vista !== 'requisicoes');
-      el('vista-estoque').classList.toggle('oculto', vista !== 'estoque');
-    }
-    document.querySelector('.abas').addEventListener('click', e => {
-      const aba = e.target.closest('[data-vista]');
-      if (!aba) return;
-      mostrarVista(aba.dataset.vista);
-      if (aba.dataset.vista === 'estoque') carregarEstoque(!!estado.estoque);
-    });
-
-    async function carregarEstoque(silencioso) {
-      if (!silencioso) el('lista-estoque').innerHTML = '<div class="vazio"><span class="girando"></span> Carregando estoque…</div>';
-      try {
-        estado.estoque = await api('listarEstoque');
-        el('atualizado-estoque').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        desenharEstoque();
-      } catch (e) {
-        if (!silencioso && estado.sessao) el('lista-estoque').innerHTML = '<div class="vazio">' + esc(mensagemErro(e)) + '</div>';
-      }
-    }
-    el('recarregar-estoque').addEventListener('click', () => carregarEstoque());
-    el('e-busca').addEventListener('input', () => { if (estado.estoque) desenharEstoque(); });
-
-    const vaiSobrar = it => Math.round((it.saldo - it.vaiSair) * 1000) / 1000;
-    const FILTROS_ESTOQUE = [
-      ['', 'Todos os itens', () => true],
-      ['saldo', 'Com saldo', it => it.saldo > 0],
-      ['saindo', 'Com saída prevista', it => it.vaiSair > 0],
-      ['falta', 'Vai faltar', it => vaiSobrar(it) < 0]
-    ];
-
-    function desenharEstoque() {
-      const itens = estado.estoque.itens;
-      el('ind-estoque').innerHTML = FILTROS_ESTOQUE.map(f =>
-        '<button type="button" class="indicador' + (f[0] === estado.filtroEstoque ? ' selecionado' : '') + '" data-filtro="' + f[0] + '"><span>' + f[1] + '</span><strong>' +
-        itens.filter(f[2]).length + '</strong></button>').join('');
-
-      const busca = el('e-busca').value.trim().toLowerCase();
-      const filtro = FILTROS_ESTOQUE.find(f => f[0] === estado.filtroEstoque)[2];
-      const lista = itens.filter(it => filtro(it) && (!busca || (it.descricao + ' ' + it.codigo).toLowerCase().includes(busca)));
-      el('lista-estoque').innerHTML = lista.length ? lista.map(it =>
-        '<button type="button" class="linha estoque-linha item" data-indice="' + itens.indexOf(it) + '">' +
-        '<span class="item-pedido"><strong>' + esc(it.descricao) + '</strong>' + (it.codigo ? '<small>' + esc(it.codigo) + '</small>' : '') + '</span>' +
-        '<span class="item-dado">' + esc(it.unidade || '—') + '</span>' +
-        '<span class="num" data-rotulo="Tenho"><strong class="' + (it.saldo < 0 ? 'negativo' : '') + '">' + esc(numeroBr(it.saldo)) + '</strong></span>' +
-        '<span class="num" data-rotulo="Vai sair">' + esc(numeroBr(it.vaiSair)) + '</span>' +
-        '<span class="num' + (vaiSobrar(it) < 0 ? ' negativo' : '') + '" data-rotulo="Vai sobrar">' + esc(numeroBr(vaiSobrar(it))) + '</span>' +
-        '<span class="item-dado" data-rotulo="Última entrada">' + esc(dataHora(it.ultimaEntrada)) + '</span>' +
-        '<span class="item-dado" data-rotulo="Última saída">' + esc(dataHora(it.ultimaSaida)) + '</span></button>').join('')
-        : '<div class="vazio">' + (itens.length ? 'Nenhum item encontrado.' : 'Nenhum item ainda. Use "Registrar entrada" para começar.') + '</div>';
-
-      const movimentos = estado.estoque.movimentos.filter(m => !busca ||
-        (m.descricao + ' ' + m.codigo + ' ' + m.requisicao).toLowerCase().includes(busca));
-      el('movimentos').innerHTML = tabelaMovimentos(movimentos, true);
-    }
-    el('ind-estoque').addEventListener('click', e => {
-      const botao = e.target.closest('[data-filtro]');
-      if (!botao) return;
-      estado.filtroEstoque = botao.dataset.filtro;
-      desenharEstoque();
-    });
-
-    function tabelaMovimentos(movimentos, comItem) {
-      if (!movimentos.length) return '<div class="vazio">Nenhuma entrada ou saída registrada.</div>';
-      return '<div class="rolagem"><table class="tabela"><thead><tr><th>Data</th><th>Tipo</th>' + (comItem ? '<th>Material</th>' : '') +
-        '<th class="num">Qtd.</th><th>Unid.</th><th>Requisição / motivo</th><th>Por</th></tr></thead><tbody>' +
-        movimentos.map(m => '<tr><td class="sem-quebra">' + esc(dataHora(m.data)) + '</td>' +
-          '<td><span class="selo ' + (m.tipo === 'Entrada' ? 'st-atendida' : 'st-em-separacao') + '">' + esc(m.tipo) + '</span></td>' +
-          (comItem ? '<td>' + esc(m.descricao) + '</td>' : '') +
-          '<td class="num">' + esc(numeroBr(m.quantidade)) + '</td><td>' + esc(m.unidade) + '</td>' +
-          '<td>' + esc([m.requisicao, m.setor, m.observacao].filter(Boolean).join(' · ') || '—') + '</td>' +
-          '<td>' + esc(m.autor) + '</td></tr>').join('') +
-        '</tbody></table></div>';
-    }
-
-    el('lista-estoque').addEventListener('click', e => {
-      const linha = e.target.closest('[data-indice]');
-      if (linha) abrirItem(estado.estoque.itens[linha.dataset.indice]);
-    });
-
-    async function abrirItem(it) {
-      const chave = it.descricao + '|' + it.unidade;
-      estado.aberta = chave;
-      el('gaveta-titulo').innerHTML = '<strong>' + esc(it.descricao) + '</strong>';
-      el('gaveta-corpo').innerHTML =
-        '<dl class="dados">' + [
-          ['Tenho', numeroBr(it.saldo) + ' ' + it.unidade], ['Vai sair', numeroBr(it.vaiSair)], ['Vai sobrar', numeroBr(vaiSobrar(it))],
-          ['Última entrada', dataHora(it.ultimaEntrada)], ['Última saída', dataHora(it.ultimaSaida)], ['Código', it.codigo || '—']
-        ].map(p => '<div><dt>' + esc(p[0]) + '</dt><dd>' + esc(p[1]) + '</dd></div>').join('') + '</dl>' +
-        '<div class="botoes-item"><button type="button" class="botao botao-primario" id="item-entrada">Registrar entrada</button>' +
-        '<button type="button" class="botao botao-secundario" id="item-saida">Registrar saída</button></div>' +
-        (it.pedidos.length ? '<h3>Requisições em aberto</h3><div class="rolagem"><table class="tabela"><thead><tr><th>Número</th><th>Setor</th><th class="num">Quantidade</th></tr></thead><tbody>' +
-          it.pedidos.map(p => '<tr><td>' + esc(p.numero) + '</td><td>' + esc(p.setor) + '</td><td class="num">' + esc(numeroBr(p.quantidade)) + '</td></tr>').join('') +
-          '</tbody></table></div>' : '') +
-        '<h3>Entradas e saídas</h3><div id="item-historico"><div class="vazio"><span class="girando"></span> Carregando…</div></div>';
-      el('item-entrada').addEventListener('click', () => abrirMovimento('Entrada', it));
-      el('item-saida').addEventListener('click', () => abrirMovimento('Saída', it));
-      el('fundo-gaveta').classList.remove('oculto');
-      el('gaveta').classList.remove('oculto');
-      try {
-        const historico = await api('historicoItem', it.descricao, it.unidade);
-        if (estado.aberta === chave) el('item-historico').innerHTML = tabelaMovimentos(historico, false);
-      } catch (e) {
-        if (estado.aberta === chave) el('item-historico').innerHTML = '<div class="alerta alerta-erro">' + esc(mensagemErro(e)) + '</div>';
-      }
-    }
-
-    // ---------- Registrar entrada ou saída ----------
-
-    function itemDoFormulario() {
-      const descricao = el('m-descricao').value.trim().toLowerCase();
-      const unidade = el('m-unidade').value;
-      const iguais = ((estado.estoque && estado.estoque.itens) || []).filter(it => it.descricao.toLowerCase() === descricao);
-      return { iguais, item: iguais.find(it => it.unidade === unidade) };
-    }
-
-    function mostrarSaldoAtual() {
-      const achado = itemDoFormulario();
-      el('m-saldo').textContent = achado.item ? 'Saldo atual: ' + numeroBr(achado.item.saldo) + ' ' + achado.item.unidade
-        : el('m-descricao').value.trim() && !achado.iguais.length ? 'Material novo: entra na lista de itens e na ficha.' : '';
-    }
-    el('m-unidade').addEventListener('change', mostrarSaldoAtual);
-    el('m-descricao').addEventListener('input', () => {
-      const achado = itemDoFormulario();
-      // Só preenche ao reconhecer o material: unidade e código continuam editáveis
-      if (achado.iguais.length && !achado.item) {
-        const primeiro = achado.iguais.find(it => it.unidade) || achado.iguais[0];
-        if (primeiro.unidade) el('m-unidade').value = primeiro.unidade;
-      }
-      if (achado.iguais.length) el('m-codigo').value = achado.iguais[0].codigo || '';
-      mostrarSaldoAtual();
-    });
-
-    function abrirMovimento(tipo, it) {
-      const entrada = tipo === 'Entrada';
-      estado.tipoMovimento = tipo;
-      el('movimento-titulo').textContent = entrada ? 'Registrar entrada' : 'Registrar saída';
-      el('movimento-aviso').textContent = entrada ? 'Material que chegou ao estoque.'
-        : 'Saída fora de requisição, como perda ou vencimento. As requisições atendidas já dão baixa sozinhas.';
-      el('m-observacao-rotulo').innerHTML = entrada ? 'Observação <span class="dica">(opcional: nota fiscal, fornecedor, lote)</span>' : 'Motivo da saída';
-      el('m-materiais').innerHTML = ((estado.estoque && estado.estoque.itens) || [])
-        .map(i => i.descricao).filter((d, i, todos) => todos.indexOf(d) === i)
-        .map(d => '<option value="' + esc(d) + '"></option>').join('');
-      el('erro-movimento').classList.add('oculto');
-      el('m-descricao').value = it ? it.descricao : '';
-      el('m-codigo').value = it ? it.codigo : '';
-      el('m-unidade').value = it && it.unidade ? it.unidade : '';
-      el('m-quantidade').value = '';
-      el('m-observacao').value = '';
-      mostrarSaldoAtual();
-      el('movimento').classList.remove('oculto');
-      (it ? el('m-quantidade') : el('m-descricao')).focus();
-    }
-    function fecharMovimento() {
-      estado.tipoMovimento = null;
-      el('movimento').classList.add('oculto');
-    }
-    el('nova-entrada').addEventListener('click', () => abrirMovimento('Entrada'));
-    el('nova-saida').addEventListener('click', () => abrirMovimento('Saída'));
-    el('m-cancelar').addEventListener('click', fecharMovimento);
-    el('fundo-movimento').addEventListener('click', fecharMovimento);
-
-    el('form-movimento').addEventListener('submit', async ev => {
-      ev.preventDefault();
-      const botao = el('m-salvar');
-      const tipo = estado.tipoMovimento;
-      el('erro-movimento').classList.add('oculto');
-      botao.disabled = true;
-      botao.innerHTML = '<span class="girando"></span> Salvando…';
-      try {
-        estado.estoque = await api('registrarMovimento', {
-          tipo: tipo,
-          codigo: el('m-codigo').value,
-          descricao: el('m-descricao').value,
-          unidade: el('m-unidade').value,
-          quantidade: el('m-quantidade').value,
-          observacao: el('m-observacao').value
-        });
-        const quantidade = el('m-quantidade').value.replace('.', ',');
-        el('atualizado-estoque').textContent = tipo + ' registrada: ' + quantidade + ' ' + el('m-unidade').value + ' de ' + el('m-descricao').value.trim() + '.';
-        fecharMovimento();
-        fechar();
-        desenharEstoque();
-      } catch (e) {
-        el('erro-movimento').textContent = mensagemErro(e);
-        el('erro-movimento').classList.remove('oculto');
-      } finally {
-        botao.disabled = false;
-        botao.textContent = 'Salvar';
-      }
-    });
-
     // ---------- Notificações na área de trabalho ----------
 
     function notificacoesLigadas() {
@@ -665,10 +389,9 @@
         dadosRequisicaoHtml(r) +
         '<h3>Itens solicitados</h3>' +
         '<div class="rolagem"><table class="tabela"><thead><tr><th>Item</th>' + (estado.tela.pedeCodigo ? '<th>Código</th>' : '') + '<th>Descrição</th><th>Unid.</th>' +
-        (estado.tela.pedeEstoque ? '<th class="num">No setor</th>' : '') + '<th class="num">Saldo</th><th class="num">Solicitada</th><th class="num">Atendida</th></tr></thead><tbody>' +
+        (estado.tela.pedeEstoque ? '<th class="num">Estoque</th>' : '') + '<th class="num">Solicitada</th><th class="num">Atendida</th></tr></thead><tbody>' +
         r.itens.map((it, i) => '<tr><td>' + (i + 1) + '</td>' + (estado.tela.pedeCodigo ? '<td>' + esc(it.codigo || '—') + '</td>' : '') + '<td>' + esc(it.descricao) + '</td><td>' + esc(it.unidade) + '</td>' +
-          (estado.tela.pedeEstoque ? '<td class="num">' + esc(numeroBr(it.estoque)) + '</td>' : '') +
-          '<td class="num' + (it.saldo < it.solicitada ? ' negativo' : '') + '">' + esc(numeroBr(it.saldo)) + '</td><td class="num">' + esc(numeroBr(it.solicitada)) + '</td>' +
+          (estado.tela.pedeEstoque ? '<td class="num">' + esc(numeroBr(it.estoque)) + '</td>' : '') + '<td class="num">' + esc(numeroBr(it.solicitada)) + '</td>' +
           '<td class="num"><input type="number" min="0" step="any" inputmode="decimal" data-item="' + i + '" value="' + (it.atendida == null ? '' : esc(it.atendida)) + '" aria-label="Quantidade atendida do item ' + (i + 1) + '"></td></tr>').join('') +
         '</tbody></table></div>' +
         '<form id="form-atender" class="acoes" novalidate>' +
@@ -689,11 +412,7 @@
     }
     el('fechar').addEventListener('click', fechar);
     el('fundo-gaveta').addEventListener('click', fechar);
-    document.addEventListener('keydown', e => {
-      if (e.key !== 'Escape') return;
-      if (estado.tipoMovimento) fecharMovimento();
-      else if (estado.aberta) fechar();
-    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && estado.aberta) fechar(); });
 
     // As regras de status ficam no servidor; a tela só mostra a mensagem que ele devolver
     async function salvar(e) {
