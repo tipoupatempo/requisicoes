@@ -117,9 +117,14 @@ Para testar localmente:
 python -m http.server 8000
 ```
 
-e abra `http://localhost:8000/`. As telas usam os scripts reais de `config.js`: requisições de teste entram na planilha de verdade, então apague-as depois.
+e abra `http://localhost:8000/`. As telas usam os scripts reais de `config.js`: requisições de teste entram na planilha de verdade, gastam a numeração (que não volta atrás) e mandam e-mail. Não envie requisição de teste no sistema em uso sem combinar com a Farmácia; para testar, use o simulador do `requisicoes-apps-script` (`testes/LEIAME.md`).
 
 ## Repositórios relacionados
 
 - [`requisicoes-apps-script`](https://github.com/tipoupatempo/requisicoes-apps-script) — código do Google (planilha, API, e-mails) e catálogo.
 - [`chamados`](https://github.com/tipoupatempo/chamados) — sistema de chamados de TI e Manutenção, no mesmo modelo.
+
+## Autoria
+
+Desenvolvido por **Kaik Gabriel Carvalho Oliveira** · TI · FUABC / Prefeitura de Santo André.
+O histórico de commits deste repositório registra a data de cada parte.
